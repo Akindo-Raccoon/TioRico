@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.gms)
 }
 
 android {
@@ -58,6 +59,9 @@ dependencies {
 
     implementation(libs.firebase.auth)
     implementation(platform(libs.firebase.bom))
+    implementation(libs.play.services.auth)
+    implementation(libs.firebase.database)  // Realtime Database
+    implementation(libs.firebase.analytics) // Analytics
 
     // ViewModel + Compose
     implementation(libs.androidx.lifecycle.viewmodel.compose)
