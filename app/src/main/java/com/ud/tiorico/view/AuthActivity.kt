@@ -62,9 +62,7 @@ class AuthActivity(): ComponentActivity() {
     }
 
     fun goToGame(){
-        val intent = Intent(this, GameActivity::class.java)
-        intent.putExtra("ROOM_ID", "sala1")
-        startActivity(intent)
+        startActivity(Intent(this, LobbyActivity::class.java))
         finish()
     }
 }

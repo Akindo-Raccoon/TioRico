@@ -12,22 +12,25 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TioRico">
         <activity
+            android:name=".viewmodel.ResultActivity"
+            android:exported="false" />
+        <activity
+            android:name=".view.LobbyActivity"
+            android:exported="false" />
+        <activity
             android:name=".view.AuthActivity"
             android:exported="true"
             android:theme="@style/Theme.TioRico">
-
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
         </activity>
-
         <activity
             android:name=".view.GameActivity"
             android:exported="false"
             android:theme="@style/Theme.TioRico" />
-
         <activity
             android:name=".MainActivity"
             android:exported="false"

@@ -8,6 +8,7 @@ import com.ud.tiorico.model.GameUiState
 import com.ud.tiorico.model.Player
 import com.ud.tiorico.repositories.GameRepository
 import com.ud.toolloop.viewmodel.util.UserSession
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,29 +22,30 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     val myUid: String get() = session.getUserId() ?: ""
     val myEmail: String get() = session.getEmail() ?: ""
+    val myName: String  get() = myEmail.substringBefore("@")
 
-    fun joinRoom(roomId: String) {
-        val player = Player(uid = myUid, email = myEmail, money = 1000)
-        viewModelScope.launch {
-            _ui.value = _ui.value.copy(isLoading = true)
-            repo.joinRoom(roomId, player)
-                .onSuccess {
-                    observeRoom(roomId)
-                    observeChat(roomId)
-                }
-                .onFailure { e -> _ui.value = _ui.value.copy(errMessage = e.message, isLoading = false) }
-        }
+    fun createRoom(roomId: String) = viewModelScope.launch {
+        _ui.value = _ui.value.copy(isLoading = true)
+        val player = Player(uid = myUid, email = myEmail)
+        repo.createRoom(roomId, player)
+            .onSuccess  { observe(roomId) }
+            .onFailure  { e -> error(e.message) }
     }
 
-    private fun observeRoom(roomId: String) {
+    fun joinRoom(roomId: String) = viewModelScope.launch {
+        _ui.value = _ui.value.copy(isLoading = true)
+        val player = Player(uid = myUid, email = myEmail)
+        repo.joinRoom(roomId, player)
+            .onSuccess  { observe(roomId) }
+            .onFailure  { e -> error(e.message) }
+    }
+
+    private fun observe(roomId: String) {
         viewModelScope.launch {
             repo.observeRoom(roomId).collect { state ->
                 _ui.value = _ui.value.copy(gameState = state, isLoading = false)
             }
         }
-    }
-
-    private fun observeChat(roomId: String) {
         viewModelScope.launch {
             repo.observeChat(roomId).collect { msgs ->
                 _ui.value = _ui.value.copy(messages = msgs)
@@ -51,42 +53,56 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun doAction(action: String) {
-        val roomId = _ui.value.gameState.roomId.ifBlank { return }
-        viewModelScope.launch {
-            repo.applyAction(roomId, myUid, action)
-                .onSuccess { _ui.value = _ui.value.copy(actionResult = "Acción: $action aplicada") }
-                .onFailure { e -> _ui.value = _ui.value.copy(errMessage = e.message) }
-        }
+    fun startGame() = viewModelScope.launch {
+        repo.startGame(_ui.value.gameState.roomId)
     }
 
-    fun nextTurn() {
-        val state = _ui.value.gameState
-        viewModelScope.launch {
-            repo.advanceTurn(state.roomId, state.currentTurn, state.maxTurns)
-        }
+    fun doAction(action: String) = viewModelScope.launch {
+        val roomId = _ui.value.gameState.roomId.ifBlank { return@launch }
+        repo.applyAction(roomId, myUid, action)
+            .onSuccess { delta ->
+                val sign    = if (delta >= 0) "+" else ""
+                val emoji   = when {
+                    action == "Ahorrar"     -> "🏦"
+                    delta > 0               -> "📈"
+                    else                    -> "📉"
+                }
+                _ui.value = _ui.value.copy(
+                    actionDelta    = delta,
+                    actionFeedback = "$emoji $action: $sign$$delta"
+                )
+                delay(2500)
+                _ui.value = _ui.value.copy(actionDelta = null, actionFeedback = "")
+            }
+            .onFailure { e -> error(e.message) }
     }
 
-    fun resetGame() {
-        val state = _ui.value.gameState
-        viewModelScope.launch {
-            repo.resetGame(state.roomId, state.players)
-        }
+    fun nextTurn() = viewModelScope.launch {
+        repo.advanceTurn(_ui.value.gameState.roomId)
+    }
+
+    fun resetGame() = viewModelScope.launch {
+        repo.resetGame(_ui.value.gameState.roomId, _ui.value.gameState.players)
     }
 
     fun sendMessage(text: String) {
         if (text.isBlank()) return
         val roomId = _ui.value.gameState.roomId.ifBlank { return }
         viewModelScope.launch {
-            val msg = ChatMessage(
-                uid = myUid,
-                email = myEmail,
-                text = text.trim(),
-                timestamp = System.currentTimeMillis()
+            repo.sendMessage(
+                roomId, ChatMessage(
+                    uid        = myUid,
+                    senderName = myName,
+                    text       = text.trim(),
+                    timestamp  = System.currentTimeMillis()
+                )
             )
-            repo.sendMessage(roomId, msg)
         }
     }
 
     fun clearError() { _ui.value = _ui.value.copy(errMessage = null) }
+
+    private fun error(msg: String?) {
+        _ui.value = _ui.value.copy(isLoading = false, errMessage = msg ?: "Error desconocido")
+    }
 }

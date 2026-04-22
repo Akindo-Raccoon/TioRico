@@ -5,5 +5,6 @@ data class Player(
     val email: String = "",
     var money: Int = 1000,
     var isAlive: Boolean = true,
-    var lastAction: String = ""
+    var lastAction: String = "",
+    val hasActed: Boolean = false
 )
