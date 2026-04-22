@@ -50,7 +50,7 @@ class AuthActivity(): ComponentActivity() {
             TioRicoTheme {
                 AuthScreen(
                     viewModel = viewModel,
-                    onLoginSuccess = { goToHome() }
+                    onLoginSuccess = { goToGame() }
                 )
             }
         }
@@ -58,12 +58,14 @@ class AuthActivity(): ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (UserSession(applicationContext).isLogged()) goToHome()
+        if (UserSession(applicationContext).isLogged()) goToGame()
     }
 
-    fun goToHome(){
-//        startActivity(Intent(this, HomeActivity::class.java))
-//        finish()
+    fun goToGame(){
+        val intent = Intent(this, GameActivity::class.java)
+        intent.putExtra("ROOM_ID", "sala1")
+        startActivity(intent)
+        finish()
     }
 }
 
@@ -147,7 +149,6 @@ fun AuthScreen(
                     modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // ── Tab selector ───────────────────────────────────────
                     AnimatedVisibility(visible = mode != AuthState.FORGOT) {
                         Row(
                             modifier = Modifier
@@ -164,10 +165,8 @@ fun AuthScreen(
                             }
                         }
                     }
-
                     Spacer(Modifier.height(24.dp))
 
-                    // ── Contenido animado ──────────────────────────────────
                     AnimatedContent(
                         targetState = mode,
                         transitionSpec = {
@@ -283,7 +282,6 @@ private fun LoginPanel(
     }
 }
 
-// ─── Register ─────────────────────────────────────────────────────────────────
 @Composable
 private fun RegisterPanel(viewModel: AuthViewModel, isLoading: Boolean, errMessage: String?) {
     var name    by rememberSaveable { mutableStateOf("") }
@@ -302,7 +300,6 @@ private fun RegisterPanel(viewModel: AuthViewModel, isLoading: Boolean, errMessa
         AuthField(name, { name = it }, "Nombre completo", Icons.Default.Person)
         Spacer(Modifier.height(12.dp))
 
-        // Tipo de documento
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(Modifier.weight(0.45f)) {
                 OutlinedButton(
@@ -368,7 +365,6 @@ private fun RegisterPanel(viewModel: AuthViewModel, isLoading: Boolean, errMessa
     }
 }
 
-// ─── Forgot ───────────────────────────────────────────────────────────────────
 @Composable
 private fun ForgotPanel(
     viewModel: AuthViewModel,
@@ -420,7 +416,6 @@ private fun ForgotPanel(
     }
 }
 
-// ─── Componentes reutilizables ────────────────────────────────────────────────
 @Composable
 private fun AuthField(
     value: String,
