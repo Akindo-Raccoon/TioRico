@@ -12,7 +12,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TioRico">
         <activity
-            android:name=".viewmodel.ResultActivity"
+            android:name=".view.ResultActivity"
             android:exported="false" />
         <activity
             android:name=".view.LobbyActivity"

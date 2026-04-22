@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -86,20 +87,6 @@ fun AuthScreen(
                 Brush.verticalGradient(listOf(Cream, CreamDark, Color(0xFFEADFC8)))
             )
     ) {
-        Box(
-            modifier = Modifier
-                .size(320.dp)
-                .offset(x = (-80).dp, y = (-80).dp)
-                .background(SageLight.copy(alpha = 0.25f), shape = RoundedCornerShape(50))
-        )
-        Box(
-            modifier = Modifier
-                .size(200.dp)
-                .align(Alignment.BottomEnd)
-                .offset(x = 60.dp, y = 60.dp)
-                .background(Sage.copy(alpha = 0.12f), shape = RoundedCornerShape(50))
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()

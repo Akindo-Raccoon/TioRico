@@ -19,9 +19,9 @@ class AuthViewModel(app: Application): AndroidViewModel(app) {
     private fun handleAuthResult(result: Result<String>, onSuccess: () -> Unit) {
         result
             .onSuccess { raw ->
-                val parts = raw.split("|")
-                val uid = parts.getOrElse(0) { "" }
-                val email = parts.getOrElse(1) { "" }
+                val parts  = raw.split("|")
+                val uid    = if (parts.size == 2) parts[0] else ""
+                val email  = if (parts.size == 2) parts[1] else parts[0]
 
                 session.saveUser(uid, email)
                 _uiState.value = LogState(isSuccess = true)

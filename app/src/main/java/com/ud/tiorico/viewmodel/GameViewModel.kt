@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ud.tiorico.model.ChatMessage
 import com.ud.tiorico.model.GameUiState
 import com.ud.tiorico.model.Player
+import com.ud.tiorico.repositories.AuthRepository
 import com.ud.tiorico.repositories.GameRepository
 import com.ud.toolloop.viewmodel.util.UserSession
 import kotlinx.coroutines.delay
@@ -15,29 +16,40 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class GameViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = GameRepository()
-    private val session = UserSession(app)
-    private val _ui = MutableStateFlow(GameUiState())
+
+    private val repo     = GameRepository()
+    private val repoAuth = AuthRepository(app)
+    private val session  = UserSession(app)
+    private val _ui      = MutableStateFlow(GameUiState())
     val ui: StateFlow<GameUiState> = _ui.asStateFlow()
 
-    val myUid: String get() = session.getUserId() ?: ""
-    val myEmail: String get() = session.getEmail() ?: ""
+    val myUid: String   get() = session.getUserId() ?: ""
+    val myEmail: String get() = session.getEmail()  ?: ""
     val myName: String  get() = myEmail.substringBefore("@")
 
     fun createRoom(roomId: String) = viewModelScope.launch {
-        _ui.value = _ui.value.copy(isLoading = true)
+        _ui.value = _ui.value.copy(isLoading = true, errMessage = null)
         val player = Player(uid = myUid, email = myEmail)
-        repo.createRoom(roomId, player)
-            .onSuccess  { observe(roomId) }
-            .onFailure  { e -> error(e.message) }
+
+        repo.createRoom(roomId.trim().uppercase(), player)
+            .onSuccess { id ->
+                observe(id)
+            }
+            .onFailure { e ->
+                _ui.value = _ui.value.copy(isLoading = false, errMessage = e.message)
+            }
     }
 
     fun joinRoom(roomId: String) = viewModelScope.launch {
-        _ui.value = _ui.value.copy(isLoading = true)
+        _ui.value = _ui.value.copy(isLoading = true, errMessage = null)
         val player = Player(uid = myUid, email = myEmail)
-        repo.joinRoom(roomId, player)
-            .onSuccess  { observe(roomId) }
-            .onFailure  { e -> error(e.message) }
+        repo.joinRoom(roomId.trim().uppercase(), player)
+            .onSuccess {
+                observe(roomId.trim().uppercase())
+            }
+            .onFailure { e ->
+                _ui.value = _ui.value.copy(isLoading = false, errMessage = e.message)
+            }
     }
 
     private fun observe(roomId: String) {
@@ -61,11 +73,11 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val roomId = _ui.value.gameState.roomId.ifBlank { return@launch }
         repo.applyAction(roomId, myUid, action)
             .onSuccess { delta ->
-                val sign    = if (delta >= 0) "+" else ""
-                val emoji   = when {
-                    action == "Ahorrar"     -> "🏦"
-                    delta > 0               -> "📈"
-                    else                    -> "📉"
+                val sign  = if (delta >= 0) "+" else ""
+                val emoji = when {
+                    action == "Ahorrar" -> "🏦"
+                    delta > 0           -> "📈"
+                    else                -> "📉"
                 }
                 _ui.value = _ui.value.copy(
                     actionDelta    = delta,
@@ -74,7 +86,7 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
                 delay(2500)
                 _ui.value = _ui.value.copy(actionDelta = null, actionFeedback = "")
             }
-            .onFailure { e -> error(e.message) }
+            .onFailure { e -> setError(e.message) }
     }
 
     fun nextTurn() = viewModelScope.launch {
@@ -90,7 +102,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         val roomId = _ui.value.gameState.roomId.ifBlank { return }
         viewModelScope.launch {
             repo.sendMessage(
-                roomId, ChatMessage(
+                roomId,
+                ChatMessage(
                     uid        = myUid,
                     senderName = myName,
                     text       = text.trim(),
@@ -100,9 +113,16 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun logout(onLogout: () -> Unit) = viewModelScope.launch {
+        repoAuth.logout()
+        session.clearSession()
+        _ui.value = GameUiState()
+        onLogout()
+    }
+
     fun clearError() { _ui.value = _ui.value.copy(errMessage = null) }
 
-    private fun error(msg: String?) {
+    private fun setError(msg: String?) {
         _ui.value = _ui.value.copy(isLoading = false, errMessage = msg ?: "Error desconocido")
     }
 }

@@ -7,5 +7,4 @@ data class GameUiState(
     val actionDelta: Int? = null,
     val actionFeedback: String = "",
     val errMessage: String? = null
-    //val actionResult: String = ""
 )

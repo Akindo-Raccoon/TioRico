@@ -8,8 +8,10 @@ import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material3.*
@@ -21,13 +23,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ud.tiorico.ui.theme.*
 import com.ud.tiorico.ui.theme.TioRicoTheme
 import com.ud.tiorico.viewmodel.GameViewModel
-import com.ud.tiorico.ui.theme.*
 
 class LobbyActivity : ComponentActivity() {
     private val viewModel: GameViewModel by viewModels()
@@ -37,8 +38,9 @@ class LobbyActivity : ComponentActivity() {
         setContent {
             TioRicoTheme {
                 LobbyScreen(
-                    viewModel  = viewModel,
-                    onGameStart = { goToGame() }
+                    viewModel   = viewModel,
+                    onGameStart = { goToGame() },
+                    onLogout    = { goToLogin() }
                 )
             }
         }
@@ -48,13 +50,21 @@ class LobbyActivity : ComponentActivity() {
         startActivity(Intent(this, GameActivity::class.java))
         finish()
     }
+
+    private fun goToLogin() {
+        startActivity(Intent(this, AuthActivity::class.java))
+        finish()
+    }
 }
 
 @Composable
-fun LobbyScreen(viewModel: GameViewModel, onGameStart: () -> Unit) {
+fun LobbyScreen(
+    viewModel: GameViewModel,
+    onGameStart: () -> Unit,
+    onLogout: () -> Unit
+) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
 
-    // Navegar cuando la partida inicia
     LaunchedEffect(ui.gameState.status) {
         if (ui.gameState.status == "playing") onGameStart()
     }
@@ -64,25 +74,38 @@ fun LobbyScreen(viewModel: GameViewModel, onGameStart: () -> Unit) {
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(Cream, CreamDark, Color(0xFFEADFC8))))
     ) {
-        // Círculos decorativos
-        Box(
-            Modifier.size(260.dp).offset((-70).dp, (-70).dp)
-                .background(SageLight.copy(alpha = 0.22f), RoundedCornerShape(50))
-        )
-        Box(
-            Modifier.size(160.dp).align(Alignment.BottomEnd).offset(50.dp, 50.dp)
-                .background(Sage.copy(alpha = 0.10f), RoundedCornerShape(50))
-        )
-
         Column(
-            modifier = Modifier.fillMaxSize().padding(28.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(48.dp))
 
-            // Ícono + título
+            Box(Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.align(Alignment.TopEnd),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    IconButton(
+                        onClick = { viewModel.logout { onLogout() } },
+                        modifier = Modifier.background(GoldLight.copy(alpha = 0.15f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = "Cerrar sesión",
+                            tint = BlueSave,
+                            modifier = Modifier.size(28.dp).padding(2.dp)
+                        )
+                    }
+                    Text("Salir", color = ErrorRed, fontSize = 11.sp)
+                }
+            }
+
+            Spacer(Modifier.height(32.dp))
+
             Box(
-                Modifier.size(72.dp)
+                Modifier
+                    .size(72.dp)
                     .background(Brush.linearGradient(listOf(Sage, SageDark)), RoundedCornerShape(20.dp)),
                 contentAlignment = Alignment.Center
             ) { Text("🎩", fontSize = 32.sp) }
@@ -93,31 +116,16 @@ fun LobbyScreen(viewModel: GameViewModel, onGameStart: () -> Unit) {
 
             Spacer(Modifier.height(36.dp))
 
-            if (ui.isLoading) {
-                CircularProgressIndicator(color = Sage)
-            } else if (ui.gameState.status == "waiting" && ui.gameState.roomId.isNotBlank()) {
-                // ── Sala creada / unido — sala de espera ─────────────────────
-                WaitingRoom(
-                    viewModel = viewModel,
-                    isHost    = ui.gameState.hostUid == viewModel.myUid
-                )
-            } else {
-                // ── Opciones iniciales ────────────────────────────────────────
-                LobbyOptions(viewModel = viewModel)
-            }
-
-            // Error
-            ui.errMessage?.let {
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    Modifier.fillMaxWidth()
-                        .background(ErrorRed.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("⚠️ $it", color = ErrorRed, fontSize = 13.sp)
+            when {
+                ui.gameState.status == "waiting" && ui.gameState.roomId.isNotBlank() -> {
+                    WaitingRoom(
+                        viewModel = viewModel,
+                        isHost    = ui.gameState.hostUid == viewModel.myUid
+                    )
                 }
-                LaunchedEffect(it) { viewModel.clearError() }
+                else -> {
+                    LobbyOptions(viewModel = viewModel)
+                }
             }
         }
     }
@@ -125,6 +133,7 @@ fun LobbyScreen(viewModel: GameViewModel, onGameStart: () -> Unit) {
 
 @Composable
 private fun LobbyOptions(viewModel: GameViewModel) {
+    val ui by viewModel.ui.collectAsStateWithLifecycle()
     var mode     by rememberSaveable { mutableStateOf<String?>(null) }
     var roomCode by rememberSaveable { mutableStateOf("") }
 
@@ -136,60 +145,92 @@ private fun LobbyOptions(viewModel: GameViewModel) {
     ) {
         Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
 
-            Text("¿Qué deseas hacer?", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextMain)
+            Text(
+                "¿Qué deseas hacer?",
+                fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TextMain
+            )
             Spacer(Modifier.height(20.dp))
 
-            // Botones principales
             LobbyOptionButton("Crear sala", Icons.Default.Add, Sage) {
                 mode = if (mode == "create") null else "create"
+                roomCode = ""
+                viewModel.clearError()
             }
             Spacer(Modifier.height(12.dp))
             LobbyOptionButton("Unirse a sala", Icons.Default.MeetingRoom, SageDark) {
                 mode = if (mode == "join") null else "join"
+                roomCode = ""
+                viewModel.clearError()
             }
 
-            // Panel expandible
-            AnimatedVisibility(visible = mode != null) {
+            AnimatedVisibility(
+                visible = mode != null,
+                enter   = fadeIn() + expandVertically(),
+                exit    = fadeOut() + shrinkVertically()
+            ) {
                 Column(Modifier.fillMaxWidth()) {
                     Spacer(Modifier.height(20.dp))
+
                     Text(
-                        text = if (mode == "create") "Código para tu sala" else "Código de la sala",
+                        text = if (mode == "create") "Elige un código para tu sala"
+                        else "Ingresa el código de la sala",
                         fontSize = 13.sp, color = TextSub
                     )
                     Spacer(Modifier.height(8.dp))
+
                     OutlinedTextField(
-                        value = roomCode,
-                        onValueChange = { roomCode = it.uppercase().take(8) },
-                        placeholder = { Text("ej: TIORICO1", color = Color.Gray, fontSize = 14.sp) },
-                        singleLine = true,
+                        value       = roomCode,
+                        onValueChange = {
+                            roomCode = it.uppercase().filter { c -> c.isLetterOrDigit() }.take(10)
+                            if (ui.errMessage != null) viewModel.clearError()
+                        },
+                        placeholder = { Text("Ej: SALA1", color = Color.Gray, fontSize = 14.sp) },
+                        singleLine  = true,
+                        isError     = ui.errMessage != null,
+                        supportingText = {
+                            ui.errMessage?.let {
+                                Text(it, color = ErrorRed, fontSize = 12.sp)
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
+                        shape    = RoundedCornerShape(12.dp),
+                        colors   = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor   = Sage,
                             unfocusedBorderColor = SageLight,
+                            errorBorderColor     = ErrorRed,
                             focusedTextColor     = TextMain,
                             unfocusedTextColor   = TextMain,
                             cursorColor          = Sage
                         )
                     )
-                    Spacer(Modifier.height(16.dp))
+
+                    Spacer(Modifier.height(12.dp))
+
                     Button(
                         onClick = {
                             if (mode == "create") viewModel.createRoom(roomCode)
                             else viewModel.joinRoom(roomCode)
                         },
-                        enabled = roomCode.length >= 4,
+                        enabled  = roomCode.length >= 3 && !ui.isLoading,
                         modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
+                        shape    = RoundedCornerShape(14.dp),
+                        colors   = ButtonDefaults.buttonColors(
                             containerColor         = Sage,
                             disabledContainerColor = SageLight
                         )
                     ) {
-                        Text(
-                            if (mode == "create") "Crear y esperar" else "Unirme",
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        if (ui.isLoading) {
+                            CircularProgressIndicator(
+                                modifier    = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color       = Color.White
+                            )
+                        } else {
+                            Text(
+                                text       = if (mode == "create") "Crear y esperar" else "Unirme",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
@@ -197,35 +238,40 @@ private fun LobbyOptions(viewModel: GameViewModel) {
     }
 }
 
-
 @Composable
 private fun WaitingRoom(viewModel: GameViewModel, isHost: Boolean) {
-    val ui by viewModel.ui.collectAsStateWithLifecycle()
+    val ui      by viewModel.ui.collectAsStateWithLifecycle()
     val players = ui.gameState.players.values.toList()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f)),
+        shape    = RoundedCornerShape(24.dp),
+        colors   = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f)),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
 
-            // Código de sala
+            // Código de sala destacado
             Text("Sala", fontSize = 13.sp, color = TextSub, letterSpacing = 1.sp)
             Text(
-                text = ui.gameState.roomId,
-                fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Sage,
+                text         = ui.gameState.roomId,
+                fontSize     = 26.sp,
+                fontWeight   = FontWeight.Bold,
+                color        = Sage,
                 letterSpacing = 4.sp
             )
             Text("Comparte este código con tus amigos", fontSize = 12.sp, color = TextSub)
 
-            Divider(color = SageLight.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 16.dp))
+            HorizontalDivider(
+                color    = SageLight.copy(alpha = 0.5f),
+                modifier = Modifier.padding(vertical = 16.dp)
+            )
 
-            // Lista de jugadores
             Text(
                 "Jugadores (${players.size})",
-                fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextMain
+                fontSize   = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color      = TextMain
             )
             Spacer(Modifier.height(10.dp))
 
@@ -235,11 +281,16 @@ private fun WaitingRoom(viewModel: GameViewModel, isHost: Boolean) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
-                        Modifier.size(36.dp)
+                        Modifier
+                            .size(36.dp)
                             .background(SageLight.copy(alpha = 0.5f), RoundedCornerShape(10.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(p.email.firstOrNull()?.uppercaseChar()?.toString() ?: "?", color = SageDark, fontWeight = FontWeight.Bold)
+                        Text(
+                            text       = p.email.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                            color      = SageDark,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                     Spacer(Modifier.width(10.dp))
                     Column {
@@ -254,22 +305,27 @@ private fun WaitingRoom(viewModel: GameViewModel, isHost: Boolean) {
 
             if (isHost) {
                 Button(
-                    onClick = { viewModel.startGame() },
-                    enabled = players.size >= 1,
+                    onClick  = { viewModel.startGame() },
+                    enabled  = players.size >= 1,
                     modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Sage, disabledContainerColor = SageLight
+                    shape    = RoundedCornerShape(14.dp),
+                    colors   = ButtonDefaults.buttonColors(
+                        containerColor         = Sage,
+                        disabledContainerColor = SageLight
                     )
                 ) {
                     Text("🎮 Iniciar partida", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
             } else {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment   = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Sage)
+                    CircularProgressIndicator(
+                        modifier    = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color       = Sage
+                    )
                     Spacer(Modifier.width(10.dp))
                     Text("Esperando que el host inicie...", color = TextSub, fontSize = 13.sp)
                 }
@@ -279,13 +335,18 @@ private fun WaitingRoom(viewModel: GameViewModel, isHost: Boolean) {
 }
 
 @Composable
-private fun LobbyOptionButton(label: String, icon: ImageVector, color: Color, onClick: () -> Unit) {
+private fun LobbyOptionButton(
+    label: String,
+    icon: ImageVector,
+    color: Color,
+    onClick: () -> Unit
+) {
     OutlinedButton(
-        onClick = onClick,
+        onClick  = onClick,
         modifier = Modifier.fillMaxWidth().height(52.dp),
-        shape = RoundedCornerShape(14.dp),
-        border = androidx.compose.foundation.BorderStroke(1.5.dp, color),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = color)
+        shape    = RoundedCornerShape(14.dp),
+        border   = androidx.compose.foundation.BorderStroke(1.5.dp, color),
+        colors   = ButtonDefaults.outlinedButtonColors(contentColor = color)
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
